@@ -13,25 +13,40 @@ use std::io::{Read, Write};
 use std::sync::Arc;
 use std::thread;
 
-fn download_image(url: &str, idx: u8, client: &Client) {
+// Download the image located at 'url', and save the downloaded image
+// to a file named "$(prefix)(idx).jpg"
+fn download_image(url: &str, idx: u32, prefix: &str, client: &Client) {
     let mut image = Vec::<u8>::new();
+    let idx = idx + 1;
     let mut res = client.get(url)
                     .header(ContentType::jpeg())
                     .send()
                     .unwrap();
     res.read_to_end(&mut image).unwrap();
-    let filename = idx.to_string() + ".jpg";
+    let filename = prefix.to_string() + &(idx.to_string()) + ".jpg";
     File::create(&filename).and_then(|mut file| {
         file.write_all(&image)
     }).unwrap();
     // println!("wrote {}", filename);
 }
 
-fn download_single_threaded(urls: Vec<String>) {
+// Parse the URL. If it is a tistory URL, return
+// the string <name>-<page#>-, else ""
+fn prefix_from_url(url: &str) -> String {
+    let re = Regex::new(r"https?://(\w+)\.tistory\.com/([0-9]+)").unwrap();
+    re.captures(url).map_or("".to_owned(), |cap| {
+        let tistory_name = cap.at(1).unwrap().to_owned();
+        let page_num = cap.at(2).unwrap().to_owned();
+        tistory_name + "-" + &page_num + "-"
+    })
+}
+
+// Download a list of images, one at a time
+fn download_single_threaded(urls: Vec<String>, prefix: &str) {
     let client = Client::new();
     let mut idx = 1;
     for url in urls {
-        download_image(&url, idx, &client);
+        download_image(&url, idx, prefix, &client);
         idx += 1;
     }
 }
@@ -62,12 +77,14 @@ fn main() {
         parser.parse_args_or_exit();
     }
 
-    // only one of -u and -f should be used
+    // exactly one of -u and -f should be used
     if url.is_empty() == file.is_empty() {
         writeln!(std::io::stderr(),
                  "usage: scraper -u <url> OR scraper -f <file>").unwrap();
         std::process::exit(1);
     }
+
+    let filename_prefix = prefix_from_url(&url);
 
     let urls = if file.is_empty() {
         let re_downscaled = Regex::new(r"http://cfile\d\d?\.uf\.tistory\.com/image/(\w|\d)+").unwrap();
@@ -105,11 +122,13 @@ fn main() {
                 .collect::<Vec<_>>()
     };
 
+    // Single-threaded download
     if single_threaded {
-        download_single_threaded(urls);
+        download_single_threaded(urls, &filename_prefix);
         return;
     }
 
+    // Multi-threaded download
     let urls = Arc::new(urls);
     const NTHREADS: usize = 4;
 
@@ -117,13 +136,14 @@ fn main() {
 
     for i in 0..NTHREADS {
         let urls = urls.clone();
+        let prefix = filename_prefix.clone();
         children.push(thread::spawn(move || {
             let client = Client::new();
             let mut j = i;
             while j < urls.len() {
                 let ref url = urls[j];
                 println!("thread {} downloaded {} {}", i, j, url);
-                download_image(&url, j as u8, &client);
+                download_image(&url, j as u32, &prefix, &client);
                 j += NTHREADS;
             }
         }));

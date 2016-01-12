@@ -4,4 +4,4 @@ running: `./target/release/scraper -f filename.txt` OR `./target/release/scraper
 
 This program fetches a list of image links from the image source of a website, matched against a static regex. Then it creates 4 threads and divides download tasks amongst them.
 
-TODO: multiplexed connections over HTTP/2, better filenames.
+TODO: multiplexed connections over HTTP/2
