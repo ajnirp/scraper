@@ -98,12 +98,13 @@ fn main() {
         let mut body = String::new();
         res.read_to_string(&mut body).unwrap();
 
-        let mut urls = re_original.captures_iter(&body).map(|cap|
-            cap.at(0).unwrap().to_owned()).collect::<BTreeSet<_>>();
+        let mut urls = re_original.captures_iter(&body)
+                                  .map(|cap| cap.at(0).unwrap().to_owned())
+                                  .collect::<BTreeSet<_>>();
 
         for cap in re_downscaled.captures_iter(&body) {
-            let url = cap.at(0).unwrap().to_owned();
-            url.replace("/image/", "/original/");
+            let url = cap.at(0).unwrap().to_owned()
+                         .replace("/image/", "/original/");
             if !urls.contains(&url) {
                 urls.insert(url);
             }
