@@ -11,6 +11,7 @@ IMG_REGEX = '<meta property="og:image" content="(.+?)" ?/>'
 # download an instagram pic
 def download(insta_url):
     fname = insta_url.split('/')[-1]
+    fname = re.sub(r'\?ig_cache_key.+$', '', fname)
     with u.urlopen(insta_url) as response:
         contents = response.read()
         with open(fname, 'wb') as f:
